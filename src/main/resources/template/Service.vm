@@ -1,0 +1,225 @@
+#if(!$package.isEmpty())
+package $package;
+
+#end
+#if(!$tablesConfig.repositoryPackageName.isEmpty())
+import ${tablesConfig.repositoryPackageName}.${table.repositoryName};
+#end
+#if(!$tablesConfig.entityPackageName.isEmpty())
+import ${tablesConfig.entityPackageName}.${table.entityName};
+#end
+#if(!$tablesConfig.voPackageName.isEmpty())
+import ${tablesConfig.voPackageName}.${entitySimpleName}${tablesConfig.voSuffixName};
+import ${tablesConfig.voPackageName}.${entitySimpleName}Update${tablesConfig.voSuffixName};
+import ${tablesConfig.voPackageName}.${entitySimpleName}Query${tablesConfig.voSuffixName};
+#end
+#if(!$tablesConfig.dtoPackageName.isEmpty())
+import ${tablesConfig.dtoPackageName}.${entitySimpleName}${tablesConfig.dtoSuffixName};
+#end
+import com.company.project.ocapi.dto.PageSort;
+import com.company.project.ocapi.domain.changehistories.AsyncChangeHistoriesService;
+import com.company.project.ocapi.utils.Convert;
+import com.company.project.ocapi.utils.StringUtils;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.InvocationTargetException;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.*;
+
+@Service
+@Transactional
+public class ${simpleName} {
+
+    @Autowired
+    private $repositoryName $repositoryVariableName;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private AsyncChangeHistoriesService asyncChangeHistoriesService;
+
+    public Object[] sumGroupBy(String field, String groupBy, ${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) throws InvocationTargetException, IllegalAccessException {
+        checkNumberField(field);
+        checkFieldExists(groupBy);
+
+        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Map> criteriaQuery = criteriaBuilder.createQuery(Map.class);
+        Root<${entitySimpleName}> root = criteriaQuery.from(${entitySimpleName}.class);
+
+        return entityManager
+                .createQuery(
+                        criteriaQuery
+                                .multiselect(criteriaBuilder.sum(root.get(field)).alias(field), root.get(groupBy).alias(groupBy))
+                                .groupBy(root.get(groupBy))
+                                .where(getPredicate(criteriaBuilder, root, queryDto)))
+                .getResultList()
+                .toArray();
+    }
+
+    public Double sum(String field, ${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) throws InvocationTargetException, IllegalAccessException {
+        checkNumberField(field);
+
+        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Object> criteriaQuery = criteriaBuilder.createQuery();
+        Root<${entitySimpleName}> root = criteriaQuery.from(${entitySimpleName}.class);
+
+        Object result = entityManager
+                .createQuery(
+                        criteriaQuery
+                                .select(criteriaBuilder.sum(root.get(field)))
+                                .where(getPredicate(criteriaBuilder, root, queryDto)))
+                .getSingleResult();
+        return Convert.toDouble(result);
+    }
+
+    private Predicate getPredicate(CriteriaBuilder criteriaBuilder, Root<${entitySimpleName}> root, ${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) throws InvocationTargetException, IllegalAccessException {
+        Predicate predicate = criteriaBuilder.conjunction();
+        for (PropertyDescriptor prop : BeanUtils.getPropertyDescriptors(queryDto.getClass())) {
+            Object value = prop.getReadMethod().invoke(queryDto);
+            if (StringUtils.isNull(value) || prop.getName().equals("class")) {
+                continue;
+            }
+            predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get(prop.getName()), value));
+        }
+        return predicate;
+    }
+
+    public List<${entitySimpleName}> findBefore(String field, OffsetDateTime timeBefore, PageSort pageSort) {
+        checkDateTimeField(field);
+        return ${repositoryVariableName}
+                .findAll((root, query, criteriaBuilder) -> criteriaBuilder.lessThanOrEqualTo(root.get(field), timeBefore), getPageRequest(pageSort))
+                .getContent();
+    }
+
+    public List<${entitySimpleName}> findAfter(String field, OffsetDateTime timeAfter, PageSort pageSort) {
+        checkDateTimeField(field);
+        return ${repositoryVariableName}
+                .findAll((root, query, criteriaBuilder) -> criteriaBuilder.greaterThanOrEqualTo(root.get(field), timeAfter), getPageRequest(pageSort))
+                .getContent();
+    }
+
+    public List<${entitySimpleName}> findBetween(String field, OffsetDateTime timeAfter, OffsetDateTime timeBefore, PageSort pageSort) {
+        checkDateTimeField(field);
+        return ${repositoryVariableName}
+                .findAll((root, query, criteriaBuilder) -> criteriaBuilder.between(root.get(field), timeAfter, timeBefore), getPageRequest(pageSort))
+                .getContent();
+    }
+
+    public List<${entitySimpleName}> findByExample(${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto, PageSort pageSort) {
+        return ${repositoryVariableName}.findAll(Example.of(getExample(queryDto)), getPageRequest(pageSort)).getContent();
+    }
+
+    public Long findCountByExample(${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) {
+        return ${repositoryVariableName}.count(Example.of(getExample(queryDto)));
+    }
+
+    public Boolean isExistsByExample(${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) {
+        return ${repositoryVariableName}.exists(Example.of(getExample(queryDto)));
+    }
+
+    private ${entitySimpleName} getExample(${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) {
+        ${entitySimpleName} example = new ${entitySimpleName}();
+        BeanUtils.copyProperties(queryDto, example);
+        return example;
+    }
+
+    public List<${entitySimpleName}> findAll(PageSort pageSort) {
+        return ${repositoryVariableName}.findAll(getPageRequest(pageSort)).getContent();
+    }
+
+    private PageRequest getPageRequest(PageSort pageSort) {
+        String sortBy = pageSort.getSortBy();
+        if (StringUtils.isNotNull(sortBy)) {
+            checkFieldExists(sortBy);
+            Sort.Direction direction = pageSort.isSortAsc() ? Sort.Direction.ASC : Sort.Direction.DESC;
+            return PageRequest.of(pageSort.getPage(), pageSort.getSize(), direction, sortBy);
+        } else {
+            return PageRequest.of(pageSort.getPage(), pageSort.getSize());
+        }
+    }
+
+    public Long findCount() {
+        return ${repositoryVariableName}.count();
+    }
+
+    public ${entitySimpleName} findById($primaryKeyDataType id) {
+        return ${repositoryVariableName}.findById(id)
+            .orElseThrow(() -> new java.util.NoSuchElementException("Resource not found: " + id));
+    }
+
+    public $primaryKeyDataType create(${entitySimpleName} bean) {
+        bean.${table.primaryColumn.setterMethodName}(null);
+        return ${repositoryVariableName}.save(bean).${table.primaryColumn.getterMethodName}();
+    }
+
+    public List<${entitySimpleName}> saveAll(List<${entitySimpleName}> beans) {
+        return ${repositoryVariableName}.saveAllAndFlush(beans);
+    }
+
+    public void update($primaryKeyDataType id, ${entitySimpleName} newBean) {
+        $entitySimpleName oldBean = new $entitySimpleName();
+        BeanUtils.copyProperties(findById(id), oldBean);
+        newBean.setId(id);
+        ${repositoryVariableName}.save(newBean);
+        asyncChangeHistoriesService.saveDiff(oldBean, newBean, id, ${entitySimpleName}.class);
+    }
+
+    public void deleteById($primaryKeyDataType id) {
+        ${repositoryVariableName}.deleteById(id);
+    }
+
+    public void delete(List<$primaryKeyDataType> ids) {
+        ${repositoryVariableName}.deleteAllByIdInBatch(ids);
+    }
+
+    private void checkDateTimeField(String field) {
+        Optional<PropertyDescriptor> propOptional = Arrays.stream(BeanUtils.getPropertyDescriptors(${entitySimpleName}.class))
+                .filter(prop -> prop.getName().equals(field))
+                .findFirst();
+        if (propOptional.isPresent()) {
+            Class<?> type = propOptional.get().getPropertyType();
+            if (!(type.equals(OffsetDateTime.class) || type.equals(LocalDate.class))) {
+                throw new IllegalArgumentException("Field type not allowed: " + field);
+            }
+        } else {
+            throw new IllegalArgumentException("Field not found: " + field);
+        }
+    }
+
+    private void checkNumberField(String field) {
+        Optional<PropertyDescriptor> propOptional = Arrays.stream(BeanUtils.getPropertyDescriptors(${entitySimpleName}.class))
+                .filter(prop -> prop.getName().equals(field))
+                .findFirst();
+        if (propOptional.isPresent()) {
+            Class<?> type = propOptional.get().getPropertyType();
+            if (!(type.equals(Long.class) || type.equals(Integer.class) || type.equals(Double.class))) {
+                throw new IllegalArgumentException("Field type not allowed: " + field);
+            }
+        } else {
+            throw new IllegalArgumentException("Field not found: " + field);
+        }
+    }
+
+    private void checkFieldExists(String field) {
+        boolean fieldExists = Arrays.stream(BeanUtils.getPropertyDescriptors(${entitySimpleName}.class))
+                .map(PropertyDescriptor::getName)
+                .anyMatch(name -> name.equals(field));
+        if (!fieldExists) {
+            throw new IllegalArgumentException("Field not found: " + field);
+        }
+    }
+}

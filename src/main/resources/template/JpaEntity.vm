@@ -1,0 +1,152 @@
+########################################################################################################################
+### Here are the variables available in the template:
+### ${USER}: System.getProperty("user.name")
+### ${DATE}: current date, format is yyyy-MM-dd
+### ${TIME}: current time, format is HH:mm:ss
+### ${YEAR}: currrent year, format is yyyy
+### ${MONTH}: current month, format is MM
+### ${DAY}: current day of month, format is dd
+### ${HOUR}: current hour of day, format is HH
+### ${MINUTE}: current minute of hour, format is mm
+### ${SECOND}: current second of minute, format is ss
+###
+### ${package}: package name, eg: org.example
+### ${importClassList}: import class list, type is java.util.List
+### ${simpleName}: repository class simple name, eg: Example
+### ${parentClass}: parent class simple name, eg: AbstractEntity, may be empty
+### ${implementClassList}: implements interface list, type is java.util.Set
+### ${config}: generator config, type is com.ifengxue.plugin.generator.config.GeneratorConfig
+###            This is main configuration, contains driver config, tables config.
+### ${tablesConfig}: table config, type is com.ifengxue.plugin.generator.config.TablesConfig, contains generator settings, eg: use Lombok, generate field comment, etc.
+### ${table}: table info and columns info, type is com.ifengxue.plugin.entity.Table
+### ${empty}: empty string
+### ${stringHelper}: some string method, eg: parseSetMethodName, parseGetMethodName, type is com.ifengxue.plugin.util.StringHelper
+### ${indent}: indent, type is com.ifengxue.plugin.generator.tree.Element.Indent
+### ${annotationList}: annotation list, type is java.util.Set, eg: Data, Entity, Table(name = "example")
+### ${serialVersionUID}: serialVersionUID
+### ${useLombok}: use or not use Lombok
+### ${columns}: table columns
+###
+###
+### For more information: https://github.com/carter-ya/idea-plugin-jpa-support/blob/master/src/main/java/com/ifengxue/plugin/generator/source/EntitySourceParserV2.java
+########################################################################################################################
+#if(!$package.isEmpty())
+package $package;
+
+#end
+#foreach($importClass in $importClassList)
+import $importClass.replace("javax.", "jakarta.");
+#end
+import jakarta.persistence.EntityListeners;
+import jakarta.validation.constraints.NotNull;
+import org.hibernate.annotations.UuidGenerator;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.format.annotation.DateTimeFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import java.io.Serial;
+
+#if($importClassList)
+    ## add empty line
+
+#end
+#if($tablesConfig.isUseClassComment() && !$table.getTableComment().isEmpty())
+/**
+* $table.getTableComment()
+*/
+#end
+#foreach($annotation in $annotationList)
+@$annotation
+#end
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class $simpleName#if(!$parentClass.isEmpty()) extends $parentClass#end#if(!$implementClassList.isEmpty()) implements $empty.join(", ", $implementClassList)#end {
+
+#if($serialVersionUID)
+       @Serial
+       private static final long serialVersionUID = ${serialVersionUID}L;
+
+#end
+#foreach($column in $columns)
+    #if($tablesConfig.isUseFieldComment() && !$column.getColumnComment().isEmpty())
+        /**
+        * $column.getColumnComment()
+        */
+    #end
+    #foreach($annotation in $column.annotations)
+        #if($column.getFieldName().equals("createdBy") || $column.getFieldName().equals("createdAt"))
+        @$annotation.replace(")", ", updatable = false)")
+        #elseif($column.getJavaDataType().getSimpleName().equals("BigDecimal"))
+        @$annotation.replace(")", ", precision=38, scale=10)")
+        #else
+        @$annotation
+        #end
+        #if($annotation.equals("Id"))
+        @UuidGenerator
+        #end
+        #if($column.getFieldName().equals("createdBy"))
+        @CreatedBy
+        #elseif($column.getFieldName().equals("createdAt"))
+        @CreatedDate
+        #elseif($column.getFieldName().equals("updatedBy"))
+        @LastModifiedBy
+        #elseif($column.getFieldName().equals("updatedAt"))
+        @LastModifiedDate
+        #end
+        #if($column.getJavaDataType().getSimpleName().equals("OffsetDateTime"))
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+        #elseif($column.getJavaDataType().getSimpleName().equals("LocalDate"))
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        #end
+        #if($annotation.contains("nullable = false") && !$column.getFieldName().equals("updatedAt") && !$column.getFieldName().equals("updatedBy") && !$column.getFieldName().equals("createdAt") && !$column.getFieldName().equals("createdBy") && !$column.getFieldName().equals("id"))
+        @NotNull(message = "$column.getFieldName() is required")
+        #end
+    #end
+        private $column.getJavaDataType().getSimpleName() $column.getFieldName()#if($tablesConfig.requireWriteDefaultValue($column)) = $column.getDefaultValue()#end;
+
+#end
+#if(!$useLombok)
+    #foreach($column in $columns)
+        #if($tablesConfig.isUseMethodComment() && !$column.getColumnComment().isEmpty())
+        /**
+        * $column.getColumnComment()
+        */
+        #end
+    public #if($tablesConfig.isUseFluidProgrammingStyle()) $simpleName #else void #end $stringHelper.parseSetMethodName($column.getFieldName())($column.getJavaDataType().getSimpleName() $column.getFieldName()) {
+    this.$column.getFieldName() = $column.getFieldName();
+        #if($tablesConfig.isUseFluidProgrammingStyle())return this;#end
+    }
+
+        #if($tablesConfig.isUseMethodComment() && !$column.getColumnComment().isEmpty())
+        /**
+        * $column.getColumnComment()
+        */
+        #end
+    public $column.getJavaDataType().getSimpleName() $stringHelper.parseGetMethodName($column.getFieldName(),$column.getJavaDataType())() {
+    return $column.getFieldName();
+    }
+
+    #end
+#end
+#if(!$useLombok)
+@Override
+public String toString() {
+return "$simpleName{" +
+    #foreach($column in $columns)
+    "$column.getFieldName()=" + $column.getFieldName() + '\'' +
+    #end
+'}';
+}
+#end
+}

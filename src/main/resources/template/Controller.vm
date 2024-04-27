@@ -1,0 +1,200 @@
+#if(!$package.isEmpty())
+package $package;
+
+#end
+#set($useSwaggerUI = $tablesConfig.isUseSwaggerUIComment())
+#set($useJPA = $tablesConfig.isUseJpa())
+#set($useMybatisPlus = $tablesConfig.isUseMybatisPlus())
+#set($useTkMybatis = $tablesConfig.isUseTkMybatis())
+#if($useSwaggerUI)
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+#end
+#if($existsJavaxValidation)
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotEmpty;
+#elseif($existsJakartaValidation)
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
+#end
+#if(!$tablesConfig.servicePackageName.isEmpty())
+import ${tablesConfig.servicePackageName}.${table.serviceName};
+#end
+#if(!$tablesConfig.voPackageName.isEmpty())
+import ${tablesConfig.voPackageName}.${entitySimpleName}${tablesConfig.voSuffixName};
+import ${tablesConfig.voPackageName}.${entitySimpleName}Update${tablesConfig.voSuffixName};
+import ${tablesConfig.voPackageName}.${entitySimpleName}Query${tablesConfig.voSuffixName};
+#end
+#if(!$tablesConfig.dtoPackageName.isEmpty())
+import ${tablesConfig.dtoPackageName}.${entitySimpleName}${tablesConfig.dtoSuffixName};
+#end
+import org.springframework.beans.factory.annotation.Autowired;
+#if($useJPA)
+import org.springframework.data.domain.Page;
+#end
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+#if($useMybatisPlus)
+import com.baomidou.mybatisplus.core.metadata.IPage;
+#end
+#if($useTkMybatis)
+import import com.github.pagehelper.Page;
+#end
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
+import com.company.project.ocarbon.aop.Loggable;
+import com.company.project.ocarbon.dto.PageSort;
+import com.company.project.ocarbon.dto.R;
+import java.lang.reflect.InvocationTargetException;
+import java.time.OffsetDateTime;
+import java.util.List;
+import ${tablesConfig.entityPackageName}.${table.entityName};
+#if($primaryKeyDataType.equals("UUID"))
+import java.util.UUID;
+#end
+
+#if($useSwaggerUI)
+@Api(tags = "$comment")
+#end
+@Tag(name ="${simpleName}", description = "$comment")
+@Validated
+@RestController
+@RequestMapping("/$table.getTableName().replace("_", "-")")
+public class ${simpleName} {
+
+    @Autowired
+    private $serviceName $serviceVariableName;
+
+    @GetMapping("/sum/{field}/group-by/{groupBy}")
+    @Loggable
+    @Operation(description = "sumGroupBy $comment")
+    public R<Object[]> sumGroupBy(@NotNull(message = "field is required") @PathVariable String field,
+                                  @NotNull(message = "groupBy is required") @PathVariable String groupBy,
+                                  @Valid ${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) throws IllegalAccessException, InvocationTargetException {
+        return R.ok(${serviceVariableName}.sumGroupBy(field, groupBy, queryDto));
+    }
+
+    @GetMapping("/sum/{field}")
+    @Loggable
+    @Operation(description = "sum $comment")
+    public R<Double> sum(@NotNull(message = "field is required") @PathVariable String field,
+                         @Valid ${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) throws IllegalAccessException, InvocationTargetException {
+        return R.ok(${serviceVariableName}.sum(field, queryDto));
+    }
+
+    @GetMapping("/before/{field}")
+    @Loggable
+    @Operation(description = "findBefore $comment")
+    public R<List<${entitySimpleName}>> findBefore(
+            @NotNull(message = "field is required") @PathVariable String field,
+            @NotNull(message = "timeBefore is required") @RequestParam OffsetDateTime timeBefore,
+            @Valid PageSort pageSort) {
+        return R.ok(${serviceVariableName}.findBefore(field, timeBefore, pageSort));
+    }
+
+    @GetMapping("/after/{field}")
+    @Loggable
+    @Operation(description = "findAfter $comment")
+    public R<List<${entitySimpleName}>> findAfter(
+            @NotNull(message = "field is required") @PathVariable String field,
+            @NotNull(message = "timeAfter is required") @RequestParam OffsetDateTime timeAfter,
+            @Valid PageSort pageSort) {
+        return R.ok(${serviceVariableName}.findAfter(field, timeAfter, pageSort));
+    }
+
+    @GetMapping("/between/{field}")
+    @Loggable
+    @Operation(description = "findBetween $comment")
+    public R<List<${entitySimpleName}>> findBetween(
+            @NotNull(message = "field is required") @PathVariable String field,
+            @NotNull(message = "timeAfter is required") @RequestParam OffsetDateTime timeAfter,
+            @NotNull(message = "timeBefore is required") @RequestParam OffsetDateTime timeBefore,
+            @Valid PageSort pageSort) {
+        return R.ok(${serviceVariableName}.findBetween(field, timeAfter, timeBefore, pageSort));
+    }
+
+    @GetMapping("/example")
+    @Loggable
+    @Operation(description = "findByExample $comment")
+    public R<List<${entitySimpleName}>> findByExample(@Valid ${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto,
+                                                      @Valid PageSort pageSort) {
+        return R.ok(${serviceVariableName}.findByExample(queryDto, pageSort));
+    }
+
+    @GetMapping("/example/count")
+    @Loggable
+    @Operation(description = "findCountByExample $comment")
+    public R<Long> findCountByExample(@Valid ${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) {
+        return R.ok(${serviceVariableName}.findCountByExample(queryDto));
+    }
+
+    @GetMapping("/example/exists")
+    @Loggable
+    @Operation(description = "isExistsByExample $comment")
+    public R<Boolean> isExistsByExample(@Valid ${entitySimpleName}${tablesConfig.dtoSuffixName} queryDto) {
+        return R.ok(${serviceVariableName}.isExistsByExample(queryDto));
+    }
+
+    @GetMapping
+    @Loggable
+    @Operation(description = "findAll $comment")
+    public R<List<${entitySimpleName}>> findAll(@Valid PageSort pageSort) {
+        return R.ok(${serviceVariableName}.findAll(pageSort));
+    }
+
+    @GetMapping("/count")
+    @Loggable
+    @Operation(description = "findCount $comment")
+    public R<Long> findCount() {
+        return R.ok(${serviceVariableName}.findCount());
+    }
+
+    @GetMapping("/{id}")
+    @Loggable
+    @Operation(description = "findById $comment")
+    public R<${entitySimpleName}> findById(@NotNull(message = "id is required") @PathVariable $primaryKeyDataType id) {
+        return R.ok(${serviceVariableName}.findById(id));
+    }
+
+    @PostMapping
+    @Loggable
+    @Operation(description = "create $comment")
+    public R<$primaryKeyDataType> create(@Valid @RequestBody ${entitySimpleName} bean) {
+        return R.ok(${serviceVariableName}.create(bean));
+    }
+
+    @PostMapping("/batch")
+    @Loggable
+    @Operation(description = "saveAll $comment")
+    public R<List<${entitySimpleName}>> saveAll(@Valid @RequestBody List<${entitySimpleName}> beans) {
+        return R.ok(${serviceVariableName}.saveAll(beans));
+    }
+
+    @PutMapping("/{id}")
+    @Loggable
+    @Operation(description ="update $comment")
+    public R update(@NotNull(message = "id is required") @PathVariable $primaryKeyDataType id,
+                    @Valid @RequestBody ${entitySimpleName} bean) {
+        ${serviceVariableName}.update(id, bean);
+        return R.ok(null, "Update Success, id: " + id);
+    }
+
+    @DeleteMapping("/{id}")
+    @Loggable
+    @Operation(description ="deleteById $comment")
+    public R deleteById(@NotNull(message = "id is required") @PathVariable $primaryKeyDataType id) {
+        ${serviceVariableName}.deleteById(id);
+        return R.ok(null, "Delete Success, id: " + id);
+    }
+
+    @DeleteMapping
+    @Loggable
+    @Operation(description ="delete $comment")
+    public R delete(@NotEmpty(message = "ids must not empty") @RequestBody List<$primaryKeyDataType> ids) {
+        ${serviceVariableName}.delete(ids);
+        return R.ok(null, "Delete Success, ids: " + ids);
+    }
+}
